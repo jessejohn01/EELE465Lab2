@@ -4,7 +4,7 @@
 /**
  * main.c
  */
-int data_in = 0;
+char data_in = 0;
 
 void setLed(int led){ //Sets an Led based on input.
     switch (led){
@@ -97,40 +97,41 @@ void initGPIO(void){
 
 void initI2C(){
     UCB0CTLW0 |= UCSWRST; // SW Reset High
-    P1SEL0 &= ~BIT2; //Set port 1.2 to SDA.
-    P1SEL1 |= BIT2; //Set port 1.2 to SDA. SELECT 01
-    P1SEL0 &= ~BIT3; //Set port 1.3 to SCL.
-    P1SEL1 |= BIT3; //Set port 1.3 to SCL. SELECT 01
-    UCB0I2COA0 = 0x60; //Set own address to 60.
-    UCB0CTLW0 |= UCSSEL_3; //Choose SMCLK or 1MHz
-    UCB0BRW = 10; // Make clock 100Khz
 
+    P1SEL1 &= ~BIT3; //Set port 1.3 to SCL. SELECT 01
+    P1SEL0 |= BIT3; //Set port 1.3 to SCL.
+
+    P1SEL1 &= ~BIT2; //Set port 1.2 to SDA. SELECT 01
+    P1SEL0 |= BIT2; //Set port 1.2 to SDA.
+
+    UCB0I2COA0 = 0x60; //Set own address to 60.
+    UCB0I2COA0 |= UCOAEN;
     UCB0CTLW0 |= UCMODE_3; //Set to I2C Mode.
     UCB0CTLW0 &= ~UCMST; //Set to slave mode.
     UCB0CTLW0 &= ~UCTR; //Set to Rx Mode.
 
+    UCB0CTLW0 &= ~UCSWRST; // SW Reset LOW
     UCB0IE |= UCRXIE0; //Enable RX interrupt.
     __enable_interrupt();
-    UCB0CTLW0 &= ~UCSWRST; // SW Reset LOW
 }
 
 
 
 int main(void)
 {
-	WDTCTL = WDTPW | WDTHOLD;	// stop watchdog timer
-	initGPIO();
-	initI2C();
+    WDTCTL = WDTPW | WDTHOLD;   // stop watchdog timer
+    initGPIO();
+    initI2C();
 
 
-	while(1){
+    while(1){
 
-	}
+    }
 
 
 }
 
-#pragma vector=EUSCI_B0_VECTOR
+#pragma vector=USCI_B0_VECTOR
 __interrupt void receiveISR(void)
 {
     data_in = UCB0RXBUF;
