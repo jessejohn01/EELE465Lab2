@@ -6,7 +6,7 @@
  */
 int data_out[8];
 int position = 0;
-int packet[8];
+char packet[8];
 void initializeGPIO(void){
     PM5CTL0 &= ~LOCKLPM5; //unlock GPIO
 
@@ -30,14 +30,14 @@ void initI2C(){
     UCB0CTLW0 |= UCSWRST; // SW Reset High
 
     UCB0CTLW0 |= UCSSEL_3; //Choose SMCLK or 1MHz
-    UCB0BRW = 10; // Make clock 100Khz
+    //UCB0BRW = 10; // Make clock 100Khz
 
     UCB0CTLW0 |= UCMODE_3; //Set to I2C Mode.
     UCB0CTLW0 |= UCMST; //Set to master mode.
     UCB0CTLW0 |= UCTR; //Set to Tx Mode.
     UCB0I2CSA = 0x0060; //Set slave address to 60.
     UCB0CTLW1 |= UCASTP_2;
-    UCB0TBCNT = 0x01;//sizeof(packet);
+    UCB0TBCNT = sizeof(packet);
 
     P1SEL1 &= ~BIT3; //Set port 1.3 to SCL. SELECT 01
     P1SEL0 |= BIT3; //Set port 1.3 to SCL.
@@ -80,11 +80,14 @@ void setAllLed(){
 void clearAllLed(){
     int i = 0;
     for(i=0; i<8; i++){
-        packet[i] = 0;
+        packet[i] = '0';
     }
     startI2C();
     delay();
-    stopI2C();
+    delay();
+    delay();
+    delay();
+    delay();
 }
 
 
@@ -449,13 +452,14 @@ int main(void)
 #pragma vector=EUSCI_B0_VECTOR
 __interrupt void sendISR(void)
 {
-    UCB0TXBUF = 0x001;
-    /*if(position == (sizeof(packet) - 1 )){
+    //UCB0TXBUF = 0x001;
+    if(position == (sizeof(packet) - 1 )){
         UCB0TXBUF = packet[position];
         position = 0;
     }else{
         UCB0TXBUF = packet[position];
         position++;
     }
-    */
+
+
 }
