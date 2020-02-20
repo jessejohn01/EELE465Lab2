@@ -3,9 +3,12 @@
 
 /**
  * main.c
+ *
+ *Made by Jesse Arstein Lab 2 Slave Code.
  */
 char data_in = 0;
-
+int position = 0;
+char pattern[8];
 void setLed(int led){ //Sets an Led based on input.
     switch (led){
     case 0:
@@ -81,6 +84,19 @@ void clearAllLed(){ //Set all LEDs to low.
     }
 }
 
+void readPattern(){
+    int i = 0;
+    for(i = 0; i<8; i++){
+        if(pattern[i] == '0'){
+            clearLed(i);
+        }
+        if(pattern[i] == '1'){
+            setLed(i);
+        }
+    }
+
+}
+
 void initGPIO(void){
     PM5CTL0 &= ~LOCKLPM5; //unlock GPIO
     P1DIR |= BIT1; //Sets rest of pins as outputs.
@@ -125,7 +141,7 @@ int main(void)
 
 
     while(1){
-
+        readPattern();
     }
 
 
@@ -135,4 +151,10 @@ int main(void)
 __interrupt void receiveISR(void)
 {
     data_in = UCB0RXBUF;
+    pattern[position] = data_in;
+    position++;
+    if(position == 8){
+        position = 0;
+    }
+
 }
