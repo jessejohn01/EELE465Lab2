@@ -3,6 +3,8 @@
 #include <stdio.h>
 /**
  * main.c
+ * Made by Jesse Arstein
+ * Master Code
  */
 int data_out[8];
 int position = 0;
@@ -62,11 +64,23 @@ void delay(){ //Delay one second on a 1MHZ clock.
 }
 
 void setLed(int inLed){
-    //Transmit one Led over I2C.
+    packet[inLed] = '1';
+    startI2C();
+    delay();
+    delay();
+    delay();
+    delay();
+    delay();
 }
 
 void clearLed(int inLed){
-    //Transmit one LED over I2C.
+    packet[inLed] = '0';
+    startI2C();
+    delay();
+    delay();
+    delay();
+    delay();
+    delay();
 }
 
 void setAllLed(){
@@ -421,7 +435,6 @@ int main(void)
         //keypadCArray = readCol(keypadCArray);
         memcpy(keypadCArray, readCol(keypadCArray), sizeof keypadCArray);//Read the Col ands store.
         memcpy(keypadRArray, readRow(keypadRArray), sizeof keypadRArray); //Read the Rows and store
-        clearAllLed();
 
         int i = 0;
         for(i=0;i<4;i++){
@@ -431,17 +444,65 @@ int main(void)
             }
         }
 
-        if(output == 'A'){
+        while(output == 'A'){
           aPattern();
+          __delay_cycles(1000000);
+          //keypadCArray = readCol(keypadCArray);
+          memcpy(keypadCArray, readCol(keypadCArray), sizeof keypadCArray);//Read the Col ands store.
+          memcpy(keypadRArray, readRow(keypadRArray), sizeof keypadRArray); //Read the Rows and store
+
+          int i = 0;
+          for(i=0;i<4;i++){
+              if(keypadRArray[i]==1){
+                  output = checkKeypad(i);
+                  printf("%c", output);
+              }
+          }
         }
-        if(output == 'B'){
+        while(output == 'B'){
           bPattern();
+          __delay_cycles(1000000);
+          //keypadCArray = readCol(keypadCArray);
+          memcpy(keypadCArray, readCol(keypadCArray), sizeof keypadCArray);//Read the Col ands store.
+          memcpy(keypadRArray, readRow(keypadRArray), sizeof keypadRArray); //Read the Rows and store
+
+          int i = 0;
+          for(i=0;i<4;i++){
+              if(keypadRArray[i]==1){
+                  output = checkKeypad(i);
+                  printf("%c", output);
+              }
+          }
         }
-        if(output == 'C'){
+        while(output == 'C'){
           cPattern();
+          __delay_cycles(1000000);
+          //keypadCArray = readCol(keypadCArray);
+          memcpy(keypadCArray, readCol(keypadCArray), sizeof keypadCArray);//Read the Col ands store.
+          memcpy(keypadRArray, readRow(keypadRArray), sizeof keypadRArray); //Read the Rows and store
+
+          int i = 0;
+          for(i=0;i<4;i++){
+              if(keypadRArray[i]==1){
+                  output = checkKeypad(i);
+                  printf("%c", output);
+              }
+          }
         }
-        if(output == 'D'){
+        while(output == 'D'){
           dPattern();
+          __delay_cycles(1000000);
+          //keypadCArray = readCol(keypadCArray);
+          memcpy(keypadCArray, readCol(keypadCArray), sizeof keypadCArray);//Read the Col ands store.
+          memcpy(keypadRArray, readRow(keypadRArray), sizeof keypadRArray); //Read the Rows and store
+
+          int i = 0;
+          for(i=0;i<4;i++){
+              if(keypadRArray[i]==1){
+                  output = checkKeypad(i);
+                  printf("%c", output);
+              }
+          }
         }
 
     }
