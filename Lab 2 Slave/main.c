@@ -4,7 +4,8 @@
 /**
  * main.c
  *
- *Made by Jesse Arstein Lab 2 Slave Code.
+ *Made by Jesse Arstein
+ *Made  Lab 2 Slave Code.
  */
 char data_in = 0;
 int position = 0;
@@ -142,6 +143,7 @@ int main(void)
 
     while(1){
         readPattern();
+
     }
 
 
@@ -156,5 +158,6 @@ __interrupt void receiveISR(void)
     if(position == 8){
         position = 0;
     }
+
 
 }
