@@ -7,9 +7,9 @@
  *Made by Jesse Arstein
  *Made  Lab 2 Slave Code.
  */
-char data_in = 0;
+char data_in = '2';
 int position = 0;
-char pattern[8];
+int pattern[8];
 void setLed(int led){ //Sets an Led based on input.
     switch (led){
     case 0:
@@ -87,11 +87,19 @@ void clearAllLed(){ //Set all LEDs to low.
 
 void readPattern(){
     int i = 0;
+    char temp = data_in;
+
+    int index = 0;
+    for(i = 7; 0 <= i; i--){
+        pattern[index] = (temp >> i) & 0x01; // grab the lsb.
+        index++;
+    }
+
     for(i = 0; i<8; i++){
-        if(pattern[i] == '0'){
+        if(pattern[i] == 0){
             clearLed(i);
         }
-        if(pattern[i] == '1'){
+        if(pattern[i] == 1){
             setLed(i);
         }
     }
@@ -129,6 +137,7 @@ void initI2C(){
 
     UCB0CTLW0 &= ~UCSWRST; // SW Reset LOW
     UCB0IE |= UCRXIE0; //Enable RX interrupt.
+
     __enable_interrupt();
 }
 
@@ -153,11 +162,4 @@ int main(void)
 __interrupt void receiveISR(void)
 {
     data_in = UCB0RXBUF;
-    pattern[position] = data_in;
-    position++;
-    if(position == 8){
-        position = 0;
-    }
-
-
 }

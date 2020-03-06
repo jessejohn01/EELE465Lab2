@@ -8,7 +8,38 @@
  */
 int data_out[8];
 int position = 0;
-char packet[8];
+int positionSent = 0;
+int packet[8];
+int addressLED[7] = {1,1,0,0,0,0,0}; // Our slave's 7 bit address.
+int queue[100][8];
+void insert(int inPacket[]){
+    if(position == 100){
+        return; //if our queue is full don't insert anything.
+    }
+    int tempArray[8];
+    memcpy(tempArray, inPacket, sizeof tempArray );
+    int i = 0;
+    for(i = 0; i<8; i++){
+        queue[position][i] = tempArray[i];
+    }
+    position++;
+
+}
+
+void clearQueue(){
+    int i = 0;
+    int j = 0;
+
+    for(i = 0 ; i<100; i++){
+        for(j=0;j<8;j++){
+            queue[i][j] = 0;
+        }
+    }
+    position = 0;
+    positionSent = 0;
+
+}
+
 void initializeGPIO(void)
 {
     PM5CTL0 &= ~LOCKLPM5; //unlock GPIO
@@ -27,66 +58,145 @@ void initializeGPIO(void)
     P3OUT |= BIT2;
     P2OUT |= BIT4;
 
+    TB0CTL |= TBCLR;
+    TB0CTL |= TBSSEL__ACLK;
+    TB0CTL |= MC__CONTINUOUS;
+    TB0CTL |= MC__UP;
+    TB0CCR0 = 10000;
+
+    TB0CTL |= TBIE;
+    TB0CTL &= ~TBIFG;
+    __enable_interrupt();
+
+}
+void sdaHigh(){ //We will use this a lot so made functions.
+    P1OUT |= BIT2;
+}
+void sclHigh(){
+    P1OUT |= BIT3;
+}
+
+void sdaLow(){ //We will use this a lot so made functions.
+    P1OUT &= ~BIT2;
+}
+void sclLow(){
+    P1OUT &= ~BIT3;
 }
 void initI2C()
 {
-    UCB0CTLW0 |= UCSWRST; // SW Reset High
-
-    UCB0CTLW0 = UCSSEL_2 | UCSWRST; //Choose SMCLK or 1MHz
-    //UCB0BRW = 10; // Make clock 100Khz //  If I implement this it becomes too slow to communicate.
-    UCB0BR1 = 0;
-    UCB0CTLW0 |= UCMODE_3; //Set to I2C Mode.
-
-    UCB0CTLW0 |= UCMST; //Set to master mode.
-    UCB0CTLW0 |= UCTR; //Set to Tx Mode.
-    UCB0I2CSA = 0x0060; //Set slave address to 60.
-    UCB0CTLW1 |= UCASTP_2;
-    UCB0TBCNT = sizeof(packet);
-
-    P1SEL1 &= ~BIT3; //Set port 1.3 to SCL. SELECT 01
-    P1SEL0 |= BIT3; //Set port 1.3 to SCL.
-
-    P1SEL1 &= ~BIT2; //Set port 1.2 to SDA. SELECT 01
-    P1SEL0 |= BIT2; //Set port 1.2 to SDA.
-
-    UCB0CTLW0 &= ~UCSWRST; // SW Reset LOW
-    UCB0IE |= UCTXIE0; //Enable TX interrupt.
-    __enable_interrupt();
+    P1DIR |= BIT3;
+    P1DIR |= BIT2;
+    sclHigh();
+    sdaHigh();
 }
 
-void startI2C()
-{
-    UCB0CTLW0 |= UCTXSTT;
+void shortestDelay(){
+    __delay_cycles(5);
 }
-void stopI2C()
-{
-    UCB0CTLW0 |= UCTXSTP;
-}
+
 void delay()
 { //Delay one second on a 1MHZ clock.
     __delay_cycles(100);
 
 }
 void shortDelay(){
-    __delay_cycles(1);
+    __delay_cycles(20);
 }
 
 void longDelay(){
-    __delay_cycles(8000000);
+    __delay_cycles(100);
 }
+
+
+void stopI2C() //Stops our i2c communications. Assumes High SCL and * SDA.
+{
+    shortDelay();
+    sclLow();
+    sdaLow();
+    shortDelay();
+    sclHigh();
+    __delay_cycles(10);
+    sdaHigh();
+    __delay_cycles(500);
+
+}
+
+void startI2C(int inAddress[],int inByte[], int rw) //Assumes a state of scl high, sda high, a 7 bit address and one byte of data.
+{
+    //rw is the read write bit.
+    sdaLow(); //Pull sda low while scl is high.
+    shortestDelay();
+    sclLow(); //Make changes during SCL Low.
+    //Send address
+    int i = 0;
+    for(i = 0; i<7 ; i++ ){ //
+        if(inAddress[i] == 1){
+            sdaHigh();
+
+        }else{
+            sdaLow();
+
+        }
+        shortDelay();
+        sclHigh(); //out data bit
+        shortDelay();
+        sclLow();
+
+    }
+
+
+    if(rw == 1){
+        sdaHigh();
+    }else{
+        sdaLow();
+    }
+
+    shortDelay();
+    sclHigh(); //Out r/w
+    shortDelay();
+
+    sclLow();
+    P1DIR &= ~BIT2; //Need to read the ACK. So float the SDA line.
+    shortDelay();
+    sclHigh(); //poll ACK.
+
+    if((P1IN & BIT2) > 0){
+        P1DIR |= BIT2; //Reset dir to output.
+        stopI2C();
+
+        return; //If we get a NACK we exit reset.
+    }
+    P1DIR |= BIT2;
+    shortDelay();
+    sclLow();
+
+    for(i = 0; i<8; i++){
+        if(inByte[i] == 1){
+
+            sdaHigh();
+        }else{
+            sdaLow();
+        }
+        shortDelay();
+        sclHigh(); //send data bit.
+        shortDelay();
+        sclLow();
+    }
+
+    shortDelay();
+
+    stopI2C();
+}
+
 void setLed(int inLed)
 {
-    packet[inLed] = '1';
-    startI2C();
-    longDelay();
+    packet[inLed] = 1;
 
 }
 
 void clearLed(int inLed)
 {
-    packet[inLed] = '0';
-    startI2C();
-    longDelay();
+    packet[inLed] = 0;
 }
 
 void setAllLed()
@@ -96,8 +206,6 @@ void setAllLed()
     {
         packet[i] = 1;
     }
-    startI2C();
-    longDelay();
 }
 
 void clearAllLed()
@@ -105,22 +213,16 @@ void clearAllLed()
     int i = 0;
     for (i = 0; i < 8; i++)
     {
-        packet[i] = '0';
+        packet[i] = 0;
     }
-    startI2C();
-    longDelay();
-}
 
+}
 void aPattern()
 {
-    setLed(0); //LED 0
-    clearLed(1); //LED 1
-    setLed(2); //LED 2
-    clearLed(3); //LED 3
-    setLed(4); //LED 4
-    clearLed(5); //LED 5
-    setLed(6); //LED 6
-    clearLed(7); //LED 7
+
+    int packet[] = {1,0,1,0,1,0,1,0};
+    insert(packet);
+    longDelay();
 }
 
 void bPattern()
@@ -128,13 +230,15 @@ void bPattern()
 
     setAllLed();
     clearLed(0);
-    shortDelay();
+    insert(packet);
+    longDelay();
     int i = 0;
     for (i = 1; i < 8; i++)
     {
         setLed(i - 1); //LED 0
         clearLed(i); //LED 1
-        shortDelay();
+        insert(packet);
+        //longDelay();
     }
     /*
      setLed(0); //LED 0
@@ -167,40 +271,46 @@ void cPattern()
 
     setLed(3);
     setLed(4);
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearLed(3);
     clearLed(4);
-    shortDelay();
+    longDelay();
     setLed(2);
     setLed(5);
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearLed(2);
     clearLed(5);
-    shortDelay();
+    longDelay();
     setLed(1);
     setLed(6);
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearLed(1);
     clearLed(6);
-    shortDelay();
+    longDelay();
     setLed(0);
     setLed(7);
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearLed(0);
     clearLed(7);
-    shortDelay();
+    longDelay();
     setLed(1);
     setLed(6);
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearLed(1);
     clearLed(6);
-    shortDelay();
+    longDelay();
     setLed(2);
     setLed(5);
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearLed(2);
     clearLed(5);
-    shortDelay();
+    longDelay();
 
 }
 
@@ -213,72 +323,82 @@ void dPattern()
     { //Step 1.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 3; i < 7; i++)
     { //Step 2.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 4; i < 8; i++)
     { //Step 3.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 5; i < 8; i++)
     { //Step 4.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 6; i < 8; i++)
     { //Step 5.
         setLed(i);
     }
-    shortDelay();
+    longDelay();
+    insert(packet);
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 7; i < 8; i++)
     { //Step 6.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
+
     for (i = 6; i < 8; i++)
     { //Step 7.
         setLed(i);
     }
-    shortDelay();
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 5; i < 8; i++)
     { //Step 8.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 4; i < 8; i++)
     { //Step 9.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
     for (i = 3; i < 7; i++)
     { //Step 10.
         setLed(i);
     }
-    shortDelay();
+    insert(packet);
+    longDelay();
     clearAllLed();
-    shortDelay();
+    longDelay();
 
 }
 
@@ -481,6 +601,8 @@ int main(void)
     int keypadCArray[4]; //Create an array of 4 for the Col.
     int keypadRArray[4]; //Create an array of 4 for the Rows
     char output = 'X';
+
+
     while (1)
     {
         delay();
@@ -519,6 +641,7 @@ int main(void)
                 }
                 if (output != 'A' && (output == 'B' || output == 'C' || output == 'D'))
                 {
+                    clearQueue();
                     break;
                 }
             }
@@ -542,6 +665,7 @@ int main(void)
             }
             if (output != 'B' && (output == 'A' || output == 'C' || output == 'D') )
             {
+                clearQueue();
                 break;
             }
             }
@@ -565,6 +689,7 @@ int main(void)
             }
             if (output != 'C' && (output == 'A' || output == 'B' || output == 'D'))
             {
+                clearQueue();
                 break;
             }
         }
@@ -588,6 +713,7 @@ int main(void)
             }
             if (output != 'D' && (output == 'A' || output == 'B' || output == 'C'))
             {
+                clearQueue();
                 break;
             }
         }
@@ -598,19 +724,13 @@ int main(void)
     return 0;
 }
 
-#pragma vector=EUSCI_B0_VECTOR
-__interrupt void sendISR(void)
-{
-    //UCB0TXBUF = 0x001;
-    if (position == (sizeof(packet) - 1))
-    {
-        UCB0TXBUF = packet[position];
-        position = 0;
+#pragma vector=TIMER0_B1_VECTOR
+__interrupt void timerEnd(void){
+    startI2C(addressLED,queue[positionSent], 0);
+    if(positionSent == 100){
+        positionSent = 0;
     }
-    else
-    {
-        UCB0TXBUF = packet[position];
-        position++;
-    }
-
+    int temp[] = queue[positionSent];
+    positionSent++;
+    TB0CTL &= ~TBIFG; //Clear timer flag.
 }
